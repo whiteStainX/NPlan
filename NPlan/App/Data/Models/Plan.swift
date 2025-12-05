@@ -5,7 +5,8 @@ import SwiftData
 class Plan {
     var name: String
     var startDate: Date
-    // Relation to WorkoutSession to be added
+    
+    @Relationship(deleteRule: .cascade) var sessions: [WorkoutSession] = []
     
     init(name: String, startDate: Date) {
         self.name = name

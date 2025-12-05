@@ -17,7 +17,9 @@ struct NPlanApp: App {
             UserProfile.self,
             Plan.self,
             WorkoutSession.self,
+            WorkoutExercise.self,
             Exercise.self,
+            SecondaryMuscle.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
