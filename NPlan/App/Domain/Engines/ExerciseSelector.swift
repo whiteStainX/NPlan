@@ -55,7 +55,6 @@ class ExerciseSelector {
             case .tier1: score += 3
             case .tier2: score += 2
             case .tier3: score += 1
-            case .none: break // Should not happen with default, but safe
             }
             
             // TODO: Add scoring for equipment match, user preferences, freshness, etc.
