@@ -132,6 +132,11 @@ struct EngineDebugView: View {
                         }
                     }
                 }
+                
+                // --- Validation Report ---
+                let validationReport = ValidationService.validate(plan: plan, blueprint: blueprint)
+                logMessage += "\n\n" + validationReport.log
+                
                 debugLog = logMessage
             } else {
                 debugLog = "❌ Generation Failed."
