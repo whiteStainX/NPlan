@@ -6,8 +6,8 @@ struct ExerciseJSON: Decodable {
     let id: String
     let name: String
     let shortName: String?
+    let type: SlotType // Stored as enum for decode safety
     let pattern: String?
-    let type: SlotType // Changed to SlotType
     let equipment: String?
     let primaryMuscle: String
     let secondaryMuscles: [SecondaryMuscleJSON]
@@ -981,36 +981,36 @@ class DataSeeder {
             
             let decoder = JSONDecoder()
             let exerciseDTOs = try decoder.decode([ExerciseJSON].self, from: data)
-            
-            for dto in exerciseDTOs {
-                let exercise = Exercise(
-                    id: dto.id,
-                    name: dto.name,
-                    shortName: dto.shortName,
-                    type: dto.type.rawValue,
-                    pattern: dto.pattern,
-                    equipment: dto.equipment,
-                    primaryMuscle: dto.primaryMuscle,
-                    defaultTempo: dto.defaultTempo,
-                    tier: dto.tier,
-                    isCompetitionLift: dto.isCompetitionLift,
-                    isUserCreated: dto.isUserCreated
-                )
-                
-                // Add secondary muscles
-                for sm in dto.secondaryMuscles {
-                    let secondary = SecondaryMuscle(muscle: sm.muscle, factor: sm.factor)
-                    exercise.secondaryMuscles.append(secondary)
-                }
-                
-                context.insert(exercise)
-            }
-            
-            try context.save()
+            try seedExercises(exerciseDTOs, in: context)
             print("✅ Seeding Complete: \(exerciseDTOs.count) exercises added.")
-            
         } catch {
             print("❌ Seeding Failed: \(error)")
         }
+    }
+
+    private static func seedExercises(_ dtos: [ExerciseJSON], in context: ModelContext) throws {
+        for dto in dtos {
+            let exercise = Exercise(
+                id: dto.id,
+                name: dto.name,
+                shortName: dto.shortName,
+                type: dto.type.rawValue,
+                pattern: dto.pattern,
+                equipment: dto.equipment,
+                primaryMuscle: dto.primaryMuscle,
+                defaultTempo: dto.defaultTempo,
+                tier: dto.tier,
+                isCompetitionLift: dto.isCompetitionLift,
+                isUserCreated: dto.isUserCreated
+            )
+
+            dto.secondaryMuscles
+                .map { SecondaryMuscle(muscle: $0.muscle, factor: $0.factor) }
+                .forEach { exercise.secondaryMuscles.append($0) }
+
+            context.insert(exercise)
+        }
+
+        try context.save()
     }
 }

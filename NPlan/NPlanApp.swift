@@ -22,30 +22,7 @@ struct NPlanApp: App {
             SecondaryMuscle.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            // If migration fails (e.g., new mandatory fields added), wipe the old store and retry
-            let fileManager = FileManager.default
-            if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-                let storeURL = appSupport.appendingPathComponent("default.store")
-                let walURL = URL(fileURLWithPath: storeURL.path + "-wal")
-                let shmURL = URL(fileURLWithPath: storeURL.path + "-shm")
-                
-                try? fileManager.removeItem(at: storeURL)
-                try? fileManager.removeItem(at: walURL)
-                try? fileManager.removeItem(at: shmURL)
-                
-                do {
-                    return try ModelContainer(for: schema, configurations: [modelConfiguration])
-                } catch {
-                    fatalError("Could not create ModelContainer after wiping store: \(error)")
-                }
-            } else {
-                fatalError("Could not locate application support directory to recover store: \(error)")
-            }
-        }
+        return Self.makeModelContainer(schema: schema, configuration: modelConfiguration)
     }()
 
     var body: some Scene {
@@ -54,5 +31,34 @@ struct NPlanApp: App {
                 .environmentObject(appState)
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    private static func makeModelContainer(schema: Schema, configuration: ModelConfiguration) -> ModelContainer {
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            // If migration fails (e.g., new mandatory fields added), wipe the old store and retry
+            purgeStoreFiles()
+            do {
+                return try ModelContainer(for: schema, configurations: [configuration])
+            } catch {
+                fatalError("Could not create ModelContainer after wiping store: \(error)")
+            }
+        }
+    }
+
+    private static func purgeStoreFiles() {
+        let fileManager = FileManager.default
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            fatalError("Could not locate application support directory to recover store")
+        }
+
+        let storeURL = appSupport.appendingPathComponent("default.store")
+        let walURL = URL(fileURLWithPath: storeURL.path + "-wal")
+        let shmURL = URL(fileURLWithPath: storeURL.path + "-shm")
+
+        try? fileManager.removeItem(at: storeURL)
+        try? fileManager.removeItem(at: walURL)
+        try? fileManager.removeItem(at: shmURL)
     }
 }
