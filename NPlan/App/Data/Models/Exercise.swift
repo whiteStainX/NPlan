@@ -8,10 +8,10 @@ class Exercise {
     var shortName: String?
     var type: String // Reverted to String for Predicate stability
     var pattern: String? // Push_Horizontal, etc.
-    var equipment: String?
+    var equipment: [EquipmentType] // Changed from String?
     var primaryMuscle: String
     var defaultTempo: String?
-    var tier: String? // Tier1, Tier2, Tier3
+    var tier: ExerciseTier // Changed from String?
     var isCompetitionLift: Bool
     var isUserCreated: Bool
     
@@ -24,10 +24,10 @@ class Exercise {
         shortName: String? = nil,
         type: String, // Reverted to String
         pattern: String? = nil,
-        equipment: String? = nil,
+        equipment: [EquipmentType], // Changed parameter type
         primaryMuscle: String,
         defaultTempo: String? = nil,
-        tier: String? = nil,
+        tier: ExerciseTier, // Changed parameter type
         isCompetitionLift: Bool = false,
         isUserCreated: Bool = false
     ) {

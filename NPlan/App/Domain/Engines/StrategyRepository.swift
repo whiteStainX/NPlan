@@ -1,4 +1,5 @@
 import Foundation
+//import EngineTypes // Required for PeriodizationPhase
 
 class StrategyRepository {
     static func getStrategy(for age: String) -> StrategyConfig {
@@ -10,7 +11,8 @@ class StrategyRepository {
                 volMax: 12,
                 repRangeCompound: (5, 5),
                 repRangeIsolation: (10, 12),
-                cycleDurationWeeks: 4 // Standard block, though linear is continuous
+                cycleDurationWeeks: 4,
+                phaseSchedule: [.general, .general, .general, .general] // Consistent progression
             )
         case "Intermediate":
             return StrategyConfig(
@@ -19,7 +21,8 @@ class StrategyRepository {
                 volMax: 15,
                 repRangeCompound: (6, 8),
                 repRangeIsolation: (10, 15),
-                cycleDurationWeeks: 4 // 3 weeks load + 1 deload
+                cycleDurationWeeks: 4, // 3 weeks load + 1 deload
+                phaseSchedule: [.accumulation, .intensification, .realization, .deload]
             )
         case "Advanced":
             return StrategyConfig(
@@ -28,7 +31,8 @@ class StrategyRepository {
                 volMax: 20,
                 repRangeCompound: (3, 6),
                 repRangeIsolation: (8, 12),
-                cycleDurationWeeks: 6 // 4 Accumulation + 2 Intensification
+                cycleDurationWeeks: 6, // 4 Accumulation + 2 Intensification
+                phaseSchedule: [.accumulation, .accumulation, .intensification, .intensification, .realization, .deload]
             )
         default:
             // Fallback to Intermediate
@@ -38,7 +42,8 @@ class StrategyRepository {
                 volMax: 15,
                 repRangeCompound: (6, 8),
                 repRangeIsolation: (10, 15),
-                cycleDurationWeeks: 4
+                cycleDurationWeeks: 4,
+                phaseSchedule: [.accumulation, .intensification, .realization, .deload]
             )
         }
     }

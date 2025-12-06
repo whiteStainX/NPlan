@@ -1,131 +1,85 @@
 import Foundation
 import SwiftData
+//import EngineTypes // For MesocycleBlueprint, StrategyConfig, SplitTemplate, DailySlot etc.
+// import ExerciseSelector // Not needed directly, ExerciseSelector is a static class
 
 class PlanGenerationService {
     
     // --- Dependencies ---
     // In a real DI setup, these would be injected.
-    // For now, we use the static Repositories directly.
+    // For now, we use the static Repositories and ExerciseSelector directly.
     
     @MainActor
-    func generatePlan(for user: UserProfile, context: ModelContext) async -> Plan? {
+    func generatePlan(blueprint: MesocycleBlueprint, context: ModelContext) async -> Plan? {
+        let user = blueprint.userProfile
+        let strategy = blueprint.strategy
+        let template = blueprint.splitTemplate
+        
         print("⚙️ Engine: Starting generation for \(user.trainingAge) / \(user.goal) / \(user.daysAvailable) days")
         
-        // --- STAGE 1: HARD PRUNING ---
-        // 1. Select Strategy (Periodization Rules)
-        let strategy = StrategyRepository.getStrategy(for: user.trainingAge)
+        // --- STAGE 1: HARD PRUNING (Blueprint already contains resolved strategy and template) ---
         print("   ✅ Strategy Selected: \(strategy.progressionModel) Model")
-        
-        // 2. Select Split Template (Skeleton)
-        guard let template = TemplateRepository.getSplitTemplate(daysAvailable: user.daysAvailable, goal: user.goal) else {
-            print("   ❌ Error: No valid split found for Days: \(user.daysAvailable), Goal: \(user.goal)")
-            return nil
-        }
         print("   ✅ Template Selected: \(template.name)")
         
-        // --- STAGE 2: SKELETON GENERATION ---
-        // Create the Plan object
-        let plan = Plan(name: "\(template.name) (\(strategy.progressionModel))", startDate: Date())
-        print("   ✅ Plan object created: \(plan.name), starting \(plan.startDate)")
+        // --- STAGE 2: SKELETON GENERATION (Determine exercises for each slot once for the mesocycle) ---
+        // This ensures exercises for a given day/slot are consistent across weeks.
+        var mesocycleExerciseSkeleton: [Int: [Int: Exercise]] = [:] // [DayIndex: [SlotIndex: Exercise]]
         
-        // --- STAGE 3: GREEDY FILLING ---
         for (dayIndex, dayTemplate) in template.days.enumerated() {
-            let session = WorkoutSession(dayIndex: dayIndex, name: dayTemplate.name)
-
-            // debug item
-            print("   ✅ Session object created: \(session.name)")
+            var dayExercises: [Int: Exercise] = [:]
+            var selectedExerciseIDsForDay: Set<String> = [] // Exclude within the same day
             
-            var selectedExerciseIDsForSession: Set<String> = []
-            
-            for slot in dayTemplate.slots {
-                if let selectedExercise = try? self._findBestMatch(
-                    slot: slot,
+            for (slotIndex, slot) in dayTemplate.slots.enumerated() {
+                if let selectedExercise = try? ExerciseSelector.selectExercise(
+                    for: slot,
                     context: context,
-                    excludeIDs: selectedExerciseIDsForSession
+                    excludeIDs: selectedExerciseIDsForDay
                 ) {
-                    // Apply Base Reps/Load from Strategy (simplified for now)
-                    let repsRange = (slot.requiredType == .compound) ? strategy.repRangeCompound : strategy.repRangeIsolation
-                    let loadInstruction = "RPE 7 (\(repsRange.0)-\(repsRange.1) Reps)" // Example
-                    
-                    let workoutExercise = WorkoutExercise(
-                        sets: slot.defaultSets,
-                        reps: "\(repsRange.0)-\(repsRange.1)",
-                        loadInstruction: loadInstruction
-                    )
-                    workoutExercise.exercise = selectedExercise
-                    session.workoutExercises.append(workoutExercise)
-                    selectedExerciseIDsForSession.insert(selectedExercise.id)
-                    
-                    print("      - Added to \(dayTemplate.name): \(selectedExercise.name)")
+                    dayExercises[slotIndex] = selectedExercise
+                    selectedExerciseIDsForDay.insert(selectedExercise.id)
+                    print("      - Skeleton for Day \(dayIndex), Slot \(slotIndex): \(selectedExercise.name)")
                 } else {
-                    print("      - Could not find exercise for slot: \(slot.requiredType.rawValue) \(slot.requiredPattern ?? "") \(slot.targetMuscle ?? "")")
+                    print("      - Could not find exercise for Day \(dayIndex), Slot \(slotIndex): \(slot.requiredType.rawValue) \(slot.requiredPattern ?? "") \(slot.targetMuscle ?? "")")
                 }
             }
-            plan.sessions.append(session)
+            mesocycleExerciseSkeleton[dayIndex] = dayExercises
+        }
+        
+        // --- STAGE 3: PLAN INSTANTIATION (Greedy Filling for multiple weeks) ---
+        // Create the Plan object
+        let plan = Plan(name: "\(template.name) (\(strategy.progressionModel)) - \(strategy.cycleDurationWeeks) Weeks", startDate: Date())
+        print("   ✅ Plan object created: \(plan.name), starting \(plan.startDate)")
+        
+        for weekIndex in 1...blueprint.strategy.cycleDurationWeeks { // Loop for each week
+            for (dayIndex, dayTemplate) in template.days.enumerated() {
+                // Ensure we have exercises for this day in the skeleton
+                guard let skeletonDayExercises = mesocycleExerciseSkeleton[dayIndex] else { continue }
+                
+                let session = WorkoutSession(weekIndex: weekIndex, dayIndex: dayIndex, name: dayTemplate.name)
+                print("   ✅ Session object created: Week \(weekIndex), Day \(dayIndex): \(session.name)")
+                
+                for (slotIndex, slot) in dayTemplate.slots.enumerated() {
+                    if let selectedExercise = skeletonDayExercises[slotIndex] {
+                        // Use ProgressionEngine to get sets, reps, load for the specific week
+                        let sets = ProgressionEngine.getSets(week: weekIndex, strategy: strategy, slotType: slot.requiredType)
+                        let reps = ProgressionEngine.getReps(week: weekIndex, strategy: strategy, slotType: slot.requiredType)
+                        let loadInstruction = ProgressionEngine.getLoadInstruction(week: weekIndex, strategy: strategy)
+                        
+                        let workoutExercise = WorkoutExercise(
+                            sets: sets,
+                            reps: reps,
+                            loadInstruction: loadInstruction
+                        )
+                        workoutExercise.exercise = selectedExercise
+                        session.workoutExercises.append(workoutExercise)
+                        
+                        print("      - Added to W\(weekIndex)D\(dayIndex)S\(slotIndex): \(selectedExercise.name) (\(sets) sets of \(reps)) - \(loadInstruction)")
+                    }
+                }
+                plan.sessions.append(session)
+            }
         }
         
         return plan
-    }
-    
-    // MARK: - Helper Methods
-    
-    // Equivalent to _find_best_match in pseudo-code
-    @MainActor
-    private func _findBestMatch(slot: DailySlot, context: ModelContext, excludeIDs: Set<String>) throws -> Exercise? {
-        var candidates: [Exercise] = []
-        
-        // Extract values to local variables to help SwiftData predicate compiler
-        // Convert Enum to String for robust Predicate comparison
-        let requiredType = slot.requiredType.rawValue
-        
-        // Attempt 1: Exact match on type, pattern, and primary muscle
-        if let pattern = slot.requiredPattern, let targetMuscle = slot.targetMuscle {
-            let predicate = #Predicate<Exercise> { exercise in
-                exercise.type == requiredType &&
-                exercise.pattern == pattern &&
-                exercise.primaryMuscle == targetMuscle &&
-                !excludeIDs.contains(exercise.id)
-            }
-            var descriptor = FetchDescriptor<Exercise>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            candidates = try context.fetch(descriptor)
-            if let exercise = candidates.first { return exercise }
-        }
-
-        // Attempt 2: Match on type and pattern
-        if let pattern = slot.requiredPattern {
-            let predicate = #Predicate<Exercise> { exercise in
-                exercise.type == requiredType &&
-                exercise.pattern == pattern &&
-                !excludeIDs.contains(exercise.id)
-            }
-            var descriptor = FetchDescriptor<Exercise>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            candidates = try context.fetch(descriptor)
-            if let exercise = candidates.first { return exercise }
-        }
-
-        // Attempt 3: Match on type and primary muscle
-        if let targetMuscle = slot.targetMuscle {
-            let predicate = #Predicate<Exercise> { exercise in
-                exercise.type == requiredType &&
-                exercise.primaryMuscle == targetMuscle &&
-                !excludeIDs.contains(exercise.id)
-            }
-            var descriptor = FetchDescriptor<Exercise>(predicate: predicate)
-            descriptor.fetchLimit = 1
-            candidates = try context.fetch(descriptor)
-            if let exercise = candidates.first { return exercise }
-        }
-        
-        // Attempt 4: Match only by type (fallback)
-        let fallbackPredicate = #Predicate<Exercise> { exercise in
-            exercise.type == requiredType &&
-            !excludeIDs.contains(exercise.id)
-        }
-        var fallbackDescriptor = FetchDescriptor<Exercise>(predicate: fallbackPredicate)
-        fallbackDescriptor.fetchLimit = 1
-        candidates = try context.fetch(fallbackDescriptor)
-        return candidates.first
     }
 }
