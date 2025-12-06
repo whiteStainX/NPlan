@@ -26,10 +26,14 @@ class PlanGenerationService {
         // --- STAGE 2: SKELETON GENERATION ---
         // Create the Plan object
         let plan = Plan(name: "\(template.name) (\(strategy.progressionModel))", startDate: Date())
+        print("   ✅ Plan object created: \(plan.name), starting \(plan.startDate)")
         
         // --- STAGE 3: GREEDY FILLING ---
         for (dayIndex, dayTemplate) in template.days.enumerated() {
             let session = WorkoutSession(dayIndex: dayIndex, name: dayTemplate.name)
+
+            // debug item
+            print("   ✅ Session object created: \(session.name)")
             
             var selectedExerciseIDsForSession: Set<String> = []
             
@@ -71,7 +75,8 @@ class PlanGenerationService {
         var candidates: [Exercise] = []
         
         // Extract values to local variables to help SwiftData predicate compiler
-        let requiredType = slot.requiredType
+        // Convert Enum to String for robust Predicate comparison
+        let requiredType = slot.requiredType.rawValue
         
         // Attempt 1: Exact match on type, pattern, and primary muscle
         if let pattern = slot.requiredPattern, let targetMuscle = slot.targetMuscle {

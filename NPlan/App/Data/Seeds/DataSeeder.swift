@@ -987,7 +987,7 @@ class DataSeeder {
                     id: dto.id,
                     name: dto.name,
                     shortName: dto.shortName,
-                    type: dto.type,
+                    type: dto.type.rawValue,
                     pattern: dto.pattern,
                     equipment: dto.equipment,
                     primaryMuscle: dto.primaryMuscle,
