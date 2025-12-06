@@ -174,14 +174,4 @@ For maximal generality and long-term scalability.
 | CP-SAT | Extremely fast & expressive | Some learning curve | Best all-around |
 | Local search | Easy integration | Not guaranteed optimal | Great for polishing plans |
 
----
-
-# Final Recommendation
-
-Start with **CSP + SoftConstraints**, because it:
-- Reuses your existing architecture
-- Makes constraints first-class and testable
-- Provides immediate quality improvements
-
-Later, evolve to **CP-SAT** for a production-grade, fully optimal solution.
 
