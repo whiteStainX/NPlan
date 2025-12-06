@@ -6,7 +6,7 @@ class Exercise {
     @Attribute(.unique) var id: String
     var name: String
     var shortName: String?
-    var type: String // Compound, Isolation, Machine
+    var type: SlotType // Changed to SlotType
     var pattern: String? // Push_Horizontal, etc.
     var equipment: String?
     var primaryMuscle: String
@@ -22,7 +22,7 @@ class Exercise {
         id: String,
         name: String,
         shortName: String? = nil,
-        type: String,
+        type: SlotType, // Changed to SlotType
         pattern: String? = nil,
         equipment: String? = nil,
         primaryMuscle: String,

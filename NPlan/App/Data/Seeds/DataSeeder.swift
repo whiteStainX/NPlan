@@ -1,12 +1,13 @@
 import Foundation
 import SwiftData
 
+
 struct ExerciseJSON: Decodable {
     let id: String
     let name: String
     let shortName: String?
     let pattern: String?
-    let type: String
+    let type: SlotType // Changed to SlotType
     let equipment: String?
     let primaryMuscle: String
     let secondaryMuscles: [SecondaryMuscleJSON]

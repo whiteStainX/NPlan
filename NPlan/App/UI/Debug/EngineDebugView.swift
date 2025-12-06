@@ -82,20 +82,30 @@ struct EngineDebugView: View {
             
             // 2. Run Engine (Mock Call for now)
             let service = PlanGenerationService()
-            let plan = await service.generatePlan(for: user)
+            let plan = await service.generatePlan(for: user, context: modelContext)
             
             // 3. Output Result
             if let plan = plan {
                 modelContext.insert(plan)
-                debugLog = """
+                
+                var logMessage = """
                 ✅ Plan Generated Successfully!
                 --------------------------------
                 Plan: \(plan.name)
-                Sessions: \(plan.sessions.count)
-                
-                Preview (First Session):
-                \(plan.sessions.first?.name ?? "N/A")
+
+                Sessions:
                 """
+                for session in plan.sessions.sorted(by: { $0.dayIndex < $1.dayIndex }) {
+                    logMessage += "\n  \(session.name) (Day \(session.dayIndex + 1)):"
+                    if session.workoutExercises.isEmpty {
+                        logMessage += "\n    (No exercises found for this session)"
+                    } else {
+                        for workoutExercise in session.workoutExercises {
+                            logMessage += "\n    - \(workoutExercise.exercise?.name ?? "Unknown Exercise") (\(workoutExercise.sets) sets of \(workoutExercise.reps)) - \(workoutExercise.loadInstruction)"
+                        }
+                    }
+                }
+                debugLog = logMessage
             } else {
                 debugLog = "❌ Generation Failed."
             }
