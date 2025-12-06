@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+//import EngineTypes // For MesocycleBlueprint, StrategyConfig etc.
 
 struct EngineDebugView: View {
     @Environment(\.modelContext) private var modelContext
@@ -77,14 +78,25 @@ struct EngineDebugView: View {
         debugLog = "Initializing Engine..."
         
         Task {
-            // 1. Create Mock User
+            // 1. Create Mock User Profile (same as before)
             let user = UserProfile(trainingAge: "Intermediate", goal: "Strength", daysAvailable: 4)
             
-            // 2. Run Engine (Mock Call for now)
-            let service = PlanGenerationService()
-            let plan = await service.generatePlan(for: user, context: modelContext)
+            // 2. Resolve Strategy and Split Template using Repositories
+            let strategy = StrategyRepository.getStrategy(for: user.trainingAge)
+            guard let template = TemplateRepository.getSplitTemplate(daysAvailable: user.daysAvailable, goal: user.goal) else {
+                debugLog = "❌ Error: No valid split template found for mock user profile."
+                isGenerating = false
+                return
+            }
             
-            // 3. Output Result
+            // 3. Create MesocycleBlueprint
+            let blueprint = MesocycleBlueprint(userProfile: user, strategy: strategy, splitTemplate: template)
+            
+            // 4. Run Engine (now with Blueprint)
+            let service = PlanGenerationService()
+            let plan = await service.generatePlan(blueprint: blueprint, context: modelContext)
+            
+            // 5. Output Result in a structured way
             if let plan = plan {
                 modelContext.insert(plan)
                 
@@ -92,16 +104,31 @@ struct EngineDebugView: View {
                 ✅ Plan Generated Successfully!
                 --------------------------------
                 Plan: \(plan.name)
-
-                Sessions:
+                Start Date: \(plan.startDate.formatted(date: .abbreviated, time: .omitted))
+                
                 """
-                for session in plan.sessions.sorted(by: { $0.dayIndex < $1.dayIndex }) {
-                    logMessage += "\n  \(session.name) (Day \(session.dayIndex + 1)):"
-                    if session.workoutExercises.isEmpty {
-                        logMessage += "\n    (No exercises found for this session)"
-                    } else {
-                        for workoutExercise in session.workoutExercises {
-                            logMessage += "\n    - \(workoutExercise.exercise?.name ?? "Unknown Exercise") (\(workoutExercise.sets) sets of \(workoutExercise.reps)) - \(workoutExercise.loadInstruction)"
+                
+                // Group sessions by week for better visualization
+                let sessionsByWeek = Dictionary(grouping: plan.sessions) { $0.weekIndex }
+                
+                for weekIndex in sessionsByWeek.keys.sorted() {
+                    logMessage += "\n=== Week \(weekIndex) ===\n"
+                    let sessionsForWeek = sessionsByWeek[weekIndex]?.sorted(by: { $0.dayIndex < $1.dayIndex }) ?? []
+                    
+                    for session in sessionsForWeek {
+                        logMessage += "  Day \(session.dayIndex + 1): \(session.name)\n"
+                        if session.workoutExercises.isEmpty {
+                            logMessage += "    (No exercises found for this session)\n"
+                        } else {
+                            for workoutExercise in session.workoutExercises {
+                                logMessage += String(format: "    - %@ (%d sets of %@) - %@ (Tier: %@, Equip: %@)\n",
+                                                     workoutExercise.exercise?.name ?? "Unknown Exercise",
+                                                     workoutExercise.sets,
+                                                     workoutExercise.reps,
+                                                     workoutExercise.loadInstruction,
+                                                     workoutExercise.exercise?.tier.rawValue ?? "N/A",
+                                                     workoutExercise.exercise?.equipment.map { $0.rawValue }.joined(separator: ", ") ?? "N/A")
+                            }
                         }
                     }
                 }
@@ -114,3 +141,4 @@ struct EngineDebugView: View {
         }
     }
 }
+

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+//import EngineTypes
 
 
 struct ExerciseJSON: Decodable {
@@ -990,16 +991,19 @@ class DataSeeder {
 
     private static func seedExercises(_ dtos: [ExerciseJSON], in context: ModelContext) throws {
         for dto in dtos {
+            let equipmentTypes = mapEquipment(dto.equipment)
+            let tier = mapTier(dto.tier)
+
             let exercise = Exercise(
                 id: dto.id,
                 name: dto.name,
                 shortName: dto.shortName,
                 type: dto.type.rawValue,
                 pattern: dto.pattern,
-                equipment: dto.equipment,
+                equipment: equipmentTypes,
                 primaryMuscle: dto.primaryMuscle,
                 defaultTempo: dto.defaultTempo,
-                tier: dto.tier,
+                tier: tier,
                 isCompetitionLift: dto.isCompetitionLift,
                 isUserCreated: dto.isUserCreated
             )
@@ -1012,5 +1016,27 @@ class DataSeeder {
         }
 
         try context.save()
+    }
+
+    /// Maps JSON equipment string to a typed array; seeds default to a single equipment type.
+    private static func mapEquipment(_ rawValue: String?) -> [EquipmentType] {
+        guard let rawValue, let equipmentType = EquipmentType(rawValue: rawValue) else {
+            return []
+        }
+        return [equipmentType]
+    }
+
+    /// Normalizes tier strings from JSON to the ExerciseTier enum, defaulting to Tier 2 when unknown.
+    private static func mapTier(_ rawValue: String?) -> ExerciseTier {
+        switch rawValue?.lowercased() {
+        case "tier1", "tier 1":
+            return .tier1
+        case "tier2", "tier 2":
+            return .tier2
+        case "tier3", "tier 3":
+            return .tier3
+        default:
+            return .tier2
+        }
     }
 }
