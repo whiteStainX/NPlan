@@ -21,7 +21,7 @@ struct EngineDebugView: View {
                 VStack(alignment: .leading) {
                     Text("Mock Profile:")
                         .font(.headline)
-                    Text("• Goal: Hypertrophy")
+                    Text("• Goal: Strength")
                     Text("• Age: Intermediate")
                     Text("• Days: 4 / Week")
                 }
@@ -78,7 +78,7 @@ struct EngineDebugView: View {
         
         Task {
             // 1. Create Mock User
-            let user = UserProfile(trainingAge: "Intermediate", goal: "Hypertrophy", daysAvailable: 4)
+            let user = UserProfile(trainingAge: "Intermediate", goal: "Strength", daysAvailable: 4)
             
             // 2. Run Engine (Mock Call for now)
             let service = PlanGenerationService()
